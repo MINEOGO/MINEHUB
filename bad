@@ -1,0 +1,150 @@
+-- ModuleScript: UILibrary
+local TweenService = game:GetService("TweenService")
+local UIScale = 1
+
+local Library = {
+    _theme = Color3.fromRGB(85, 170, 255),
+    _windows = {},
+    _currentTab = nil,
+}
+
+local function tween(obj, props, time)
+    TweenService:Create(obj, TweenInfo.new(time or 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), props):Play()
+end
+
+function Library:CreateWindow(title)
+    local screenGui = Instance.new("ScreenGui", game.Players.LocalPlayer:WaitForChild("PlayerGui"))
+    screenGui.Name = title
+
+    local main = Instance.new("Frame", screenGui)
+    main.Size = UDim2.new(0, 500, 0, 300)
+    main.Position = UDim2.new(0.5, -250, 0.5, -150)
+    main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    main.BorderSizePixel = 0
+    main.Name = "Main"
+    main.ClipsDescendants = true
+
+    local tabsHolder = Instance.new("Frame", main)
+    tabsHolder.Size = UDim2.new(0, 120, 1, 0)
+    tabsHolder.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+
+    local pagesHolder = Instance.new("Frame", main)
+    pagesHolder.Position = UDim2.new(0, 120, 0, 0)
+    pagesHolder.Size = UDim2.new(1, -120, 1, 0)
+    pagesHolder.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+
+    local UIListLayout = Instance.new("UIListLayout", tabsHolder)
+    UIListLayout.Padding = UDim.new(0, 4)
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local window = {
+        main = main,
+        pages = {},
+        tabs = {},
+    }
+
+    function window:CreateTab(name)
+        local button = Instance.new("TextButton", tabsHolder)
+        button.Text = name
+        button.Size = UDim2.new(1, -10, 0, 30)
+        button.BackgroundColor3 = Library._theme
+        button.BorderSizePixel = 0
+        button.TextColor3 = Color3.new(1, 1, 1)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 14
+
+        local page = Instance.new("ScrollingFrame", pagesHolder)
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.Visible = false
+        page.ScrollBarThickness = 4
+        local layout = Instance.new("UIListLayout", page)
+        layout.Padding = UDim.new(0, 8)
+
+        button.MouseButton1Click:Connect(function()
+            if Library._currentTab then
+                Library._currentTab.Visible = false
+            end
+            page.Visible = true
+            Library._currentTab = page
+        end)
+
+        window.pages[name] = page
+        window.tabs[name] = button
+        return {
+            AddToggle = function(self, text, callback)
+                local toggle = Instance.new("TextButton", page)
+                toggle.Size = UDim2.new(1, -10, 0, 30)
+                toggle.Text = text .. ": OFF"
+                toggle.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                toggle.TextColor3 = Color3.new(1, 1, 1)
+                toggle.Font = Enum.Font.Gotham
+                toggle.TextSize = 14
+                toggle.BorderSizePixel = 0
+
+                local state = false
+                toggle.MouseButton1Click:Connect(function()
+                    state = not state
+                    toggle.Text = text .. ": " .. (state and "ON" or "OFF")
+                    callback(state)
+                    tween(toggle, {BackgroundColor3 = state and Library._theme or Color3.fromRGB(40, 40, 40)}, 0.2)
+                end)
+            end,
+            AddSlider = function(self, text, min, max, callback)
+                local sliderFrame = Instance.new("Frame", page)
+                sliderFrame.Size = UDim2.new(1, -10, 0, 40)
+                sliderFrame.BackgroundTransparency = 1
+
+                local label = Instance.new("TextLabel", sliderFrame)
+                label.Size = UDim2.new(1, 0, 0, 20)
+                label.Text = text
+                label.TextColor3 = Color3.new(1, 1, 1)
+                label.Font = Enum.Font.Gotham
+                label.TextSize = 14
+                label.BackgroundTransparency = 1
+
+                local slider = Instance.new("TextButton", sliderFrame)
+                slider.Position = UDim2.new(0, 0, 0, 20)
+                slider.Size = UDim2.new(1, 0, 0, 20)
+                slider.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+                slider.Text = ""
+                slider.BorderSizePixel = 0
+
+                local fill = Instance.new("Frame", slider)
+                fill.Size = UDim2.new(0, 0, 1, 0)
+                fill.BackgroundColor3 = Library._theme
+                fill.BorderSizePixel = 0
+
+                local dragging = false
+                slider.MouseButton1Down:Connect(function()
+                    dragging = true
+                end)
+                game:GetService("UserInputService").InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        dragging = false
+                    end
+                end)
+                game:GetService("RunService").RenderStepped:Connect(function()
+                    if dragging then
+                        local mouseX = game.Players.LocalPlayer:GetMouse().X
+                        local pos = (mouseX - slider.AbsolutePosition.X) / slider.AbsoluteSize.X
+                        pos = math.clamp(pos, 0, 1)
+                        fill.Size = UDim2.new(pos, 0, 1, 0)
+                        local val = math.floor(min + (max - min) * pos)
+                        callback(val)
+                    end
+                end)
+            end,
+            SetColorTheme = function(self, color)
+                Library._theme = color
+                for _, tab in pairs(window.tabs) do
+                    tween(tab, {BackgroundColor3 = color})
+                end
+            end
+        }
+    end
+
+    return window
+end
+
+return Library
